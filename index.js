@@ -30,6 +30,12 @@ async function run() {
             res.send(result)
         })
 
+        app.get('/booking',async(req,res) => {
+            const query = {}
+            const booking = await bookingCollections.find(query).toArray()
+            res.send(booking)
+        })
+
         app.post('/booking',async(req,res) => {
             const booking =  req.body
             const result = await bookingCollections.insertOne(booking)
