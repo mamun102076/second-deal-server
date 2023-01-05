@@ -15,6 +15,7 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 async function run() {
     try{
         const categoryCollections = client.db('secondDeal').collection('category')
+        const bookingCollections = client.db('secondDeal').collection('booking')
 
         app.get('/category',async (req,res) => {
             const query = {}
@@ -26,6 +27,12 @@ async function run() {
             const id = req.params.id
             const filter = { _id: ObjectId(id) }
             const result = await categoryCollections.findOne(filter)  
+            res.send(result)
+        })
+
+        app.post('/booking',async(req,res) => {
+            const booking =  req.body
+            const result = await bookingCollections.insertOne(booking)
             res.send(result)
         })
     }
