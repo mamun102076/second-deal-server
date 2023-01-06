@@ -80,6 +80,27 @@ async function run() {
             const sellers = await sellerCollections.find(query).toArray()
             res.send(sellers)
         })
+
+        app.put('/users/admin/:id',async(req,res) => {
+            const id = req.params.id
+            const filter = { _id: ObjectId(id) }
+            const buyer = await buyersCollections.findOne(filter)
+            const updatedDoc = {
+                $set: {
+                    role: 'Admin'
+                }
+            }
+            const options = { upsert: true }
+
+            if (buyer) {
+                const buyerUpdate = await buyersCollections.updateOne(filter,updatedDoc,options)
+                return res.send(buyerUpdate)
+            }
+
+            const sellerUpdate = await sellerCollections.updateOne(filter,updatedDoc,options)
+            res.send(sellerUpdate)
+        })
+
     }
     finally{
 
