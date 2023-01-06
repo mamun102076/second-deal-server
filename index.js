@@ -74,6 +74,12 @@ async function run() {
             const buyers = await buyersCollections.find(query).toArray()
             res.send(buyers)
         })
+
+        app.get('/seller',async (req,res) => {
+            const query = {}
+            const sellers = await sellerCollections.find(query).toArray()
+            res.send(sellers)
+        })
     }
     finally{
 
