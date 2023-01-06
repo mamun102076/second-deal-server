@@ -17,7 +17,6 @@ async function run() {
         const categoryCollections = client.db('secondDeal').collection('category')
         const bookingCollections = client.db('secondDeal').collection('booking')
         const productsCollections = client.db('secondDeal').collection('products')
-        const usersCollections = client.db('secondDeal').collection('users')
         const sellerCollections = client.db('secondDeal').collection('seller')
         const buyersCollections = client.db('secondDeal').collection('buyer')
 
@@ -59,18 +58,21 @@ async function run() {
         })
 
         app.post('/users',async(req,res) => {
-            const user = req.body
+            const query = req.body
 
-            if (user.providerId=="seller") {
-                const result = await sellerCollections.insertOne(user)
-                return res.send(result)
+            if (query.providerId=="seller") {
+                const seller = await sellerCollections.insertOne(query)
+                return res.send(seller)
             }
-            else if (user.providerId=="firebase") {
-                const result = await buyersCollections.insertOne(user)
-                return res.send(result)
-            }
-            const result = await usersCollections.insertOne(user)
-            res.send(result)
+
+            const buyer = await buyersCollections.insertOne(query)
+            res.send(buyer)
+        })
+
+        app.get('/buyers',async (req,res) => {
+            const query = {}
+            const buyers = await buyersCollections.find(query).toArray()
+            res.send(buyers)
         })
     }
     finally{
