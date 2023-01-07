@@ -75,10 +75,24 @@ async function run() {
             res.send(buyers)
         })
 
+        app.delete('/buyers/:id',async (req,res) => {
+            const id = req.params.id
+            const filter = { _id: ObjectId(id) }
+            const buyer = await buyersCollections.deleteOne(filter)
+            res.send(buyer)
+        })
+
         app.get('/seller',async (req,res) => {
             const query = {}
             const sellers = await sellerCollections.find(query).toArray()
             res.send(sellers)
+        })
+
+        app.delete('/seller/:id',async (req,res) => {
+            const id = req.params.id
+            const filter = { _id: ObjectId(id) }
+            const seller = await sellerCollections.deleteOne(filter)
+            res.send(seller)
         })
 
         app.put('/users/admin/:id',async(req,res) => {
