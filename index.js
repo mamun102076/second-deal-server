@@ -73,6 +73,20 @@ async function run() {
             res.send(result)
         })
 
+        app.delete('/booking/:id',verifyJwt, async (req, res) => {
+            const decodedEmail = req.decoded.email
+            const query = { email: decodedEmail }
+            const result = await buyersCollections.findOne(query)
+            if (!result) {
+                return res.status(404).send('unathorized access')
+            }
+
+            const id = req.params.id
+            const filter = { _id: ObjectId(id) }
+            const booking = await bookingCollections.deleteOne(filter)
+            res.send(booking)
+        })
+
         app.get('/products', async (req, res) => {
             const query = {}
             const result = await productsCollections.find(query).toArray()
@@ -89,7 +103,6 @@ async function run() {
             const decodedEmail = req.decoded.email
             const query = { email: decodedEmail }
             const seller = await sellerCollections.findOne(query)
-            console.log(seller)
             if (!seller) {
                 return res.status(404).send('unathorized access')
             }
@@ -124,6 +137,42 @@ async function run() {
 
             const buyer = await buyersCollections.insertOne(query)
             res.send(buyer)
+        })
+
+        app.get('/user/admin/:email', async (req, res) => {
+            const email = req.params.email
+            const query = { email }
+            const buyer = await buyersCollections.findOne(query)
+            const seller = await sellerCollections.findOne(query)
+            if (buyer) {
+                return res.send({isAdmin: buyer.role=='Admin'})
+            }else if (seller) {
+                return res.send({isAdmin: seller.role=='Admin'})
+            }else{
+                res.send({isAdmin: false})
+            }
+        })
+
+        app.get('/user/buyer/:email', async (req, res) => {
+            const email = req.params.email
+            const query = { email }
+            const buyer = await buyersCollections.findOne(query)
+            if (buyer) {
+                return res.send({isBuyer: buyer.providerId=='user'})
+            }else{
+                return res.send({isBuyer: false})
+            }
+        })
+
+        app.get('/user/seller/:email', async (req, res) => {
+            const email = req.params.email
+            const query = { email }
+            const seller = await sellerCollections.findOne(query)
+            if (seller) {
+                return res.send({isSeller: seller.providerId=='seller'})
+            }else{
+                return res.send({isSeller: false})
+            }
         })
 
         app.get('/buyers', async (req, res) => {
