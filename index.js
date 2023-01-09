@@ -5,6 +5,7 @@ const app = express()
 const jwt = require('jsonwebtoken')
 const port = process.env.PORT || 5000
 require('dotenv').config()
+const stripe = require("stripe")(process.env.STRIPE_SK)
 
 app.use(express.json())
 app.use(cors())
@@ -35,16 +36,21 @@ async function run() {
         const productsCollections = client.db('secondDeal').collection('products')
         const sellerCollections = client.db('secondDeal').collection('seller')
         const buyersCollections = client.db('secondDeal').collection('buyer')
+        const paymentCollections = client.db('secondDeal').collection('payment')
 
-        const verifyAdmin = async (req,res,next) => {
+        const verifyAdmin = async (req, res, next) => {
             const decodedEmail = req.decoded.email
-            const query = { email: decodedEmail}
+            console.log(decodedEmail)
+            const query = { email: decodedEmail }
             const buyerUser = await buyersCollections.findOne(query)
             const sellerUser = await sellerCollections.findOne(query)
-            if (buyerUser.role!=="Admin" || sellerUser.role!=="Admin") {
-                return res.status(404).send('unauthorized access')
+            console.log(buyerUser)
+            console.log(sellerUser)
+
+            if (buyerUser.role == 'Admin' || sellerUser?.role == 'Admin') {
+                return next()
             }
-            next()
+            res.status(401).send('unauthorized access')
         }
 
         app.get('/category', async (req, res) => {
@@ -73,7 +79,7 @@ async function run() {
             res.send(result)
         })
 
-        app.delete('/booking/:id',verifyJwt, async (req, res) => {
+        app.delete('/booking/:id', verifyJwt, async (req, res) => {
             const decodedEmail = req.decoded.email
             const query = { email: decodedEmail }
             const result = await buyersCollections.findOne(query)
@@ -99,7 +105,7 @@ async function run() {
             res.send(result)
         })
 
-        app.delete('/products/:id',verifyJwt, async (req, res) => {
+        app.delete('/products/:id', verifyJwt, async (req, res) => {
             const decodedEmail = req.decoded.email
             const query = { email: decodedEmail }
             const seller = await sellerCollections.findOne(query)
@@ -123,9 +129,8 @@ async function run() {
                 const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '1h' })
                 return res.send({ accessToken: token })
             }
-            res.send({ accessToken: '' })
+            return res.send({ accessToken: '' })
         })
-
 
         app.post('/users', async (req, res) => {
             const query = req.body
@@ -139,39 +144,14 @@ async function run() {
             res.send(buyer)
         })
 
-        app.get('/user/admin/:email', async (req, res) => {
-            const email = req.params.email
-            const query = { email }
-            const buyer = await buyersCollections.findOne(query)
-            const seller = await sellerCollections.findOne(query)
-            if (buyer) {
-                return res.send({isAdmin: buyer.role=='Admin'})
-            }else if (seller) {
-                return res.send({isAdmin: seller.role=='Admin'})
-            }else{
-                res.send({isAdmin: false})
-            }
-        })
-
         app.get('/user/buyer/:email', async (req, res) => {
             const email = req.params.email
             const query = { email }
             const buyer = await buyersCollections.findOne(query)
             if (buyer) {
-                return res.send({isBuyer: buyer.providerId=='user'})
-            }else{
-                return res.send({isBuyer: false})
-            }
-        })
-
-        app.get('/user/seller/:email', async (req, res) => {
-            const email = req.params.email
-            const query = { email }
-            const seller = await sellerCollections.findOne(query)
-            if (seller) {
-                return res.send({isSeller: seller.providerId=='seller'})
-            }else{
-                return res.send({isSeller: false})
+                return res.send({ isBuyer: buyer.providerId == 'user' })
+            } else {
+                return res.send({ isBuyer: false })
             }
         })
 
@@ -181,7 +161,7 @@ async function run() {
             res.send(buyers)
         })
 
-        app.delete('/buyers/:id',verifyJwt, verifyAdmin, async (req, res) => {
+        app.delete('/buyers/:id', verifyJwt, verifyAdmin, async (req, res) => {
             const id = req.params.id
             const filter = { _id: ObjectId(id) }
             const buyer = await buyersCollections.deleteOne(filter)
@@ -194,11 +174,49 @@ async function run() {
             res.send(sellers)
         })
 
-        app.delete('/seller/:id',verifyJwt,verifyAdmin, async (req, res) => {
+        app.put('/seller/:id', async (req, res) => {
+            const id = req.params.id
+            const filter = { _id: ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    verification: 'verified'
+                }
+            }
+            const options = { upsert: true }
+            const seller = await sellerCollections.updateOne(filter, updatedDoc, options)
+            res.send(seller)
+        })
+
+        app.delete('/seller/:id', verifyJwt, verifyAdmin, async (req, res) => {
             const id = req.params.id
             const filter = { _id: ObjectId(id) }
             const seller = await sellerCollections.deleteOne(filter)
             res.send(seller)
+        })
+
+        app.get('/user/seller/:email', async (req, res) => {
+            const email = req.params.email
+            const query = { email }
+            const seller = await sellerCollections.findOne(query)
+            if (seller) {
+                return res.send({ isSeller: seller.providerId == 'seller' })
+            } else {
+                return res.send({ isSeller: false })
+            }
+        })
+
+        app.get('/user/admin/:email', async (req, res) => {
+            const email = req.params.email
+            const query = { email }
+            const buyer = await buyersCollections.findOne(query)
+            const seller = await sellerCollections.findOne(query)
+            if (buyer) {
+                return res.send({ isAdmin: buyer.role == 'Admin' })
+            } else if (seller) {
+                return res.send({ isAdmin: seller.role == 'Admin' })
+            } else {
+                res.send({ isAdmin: false })
+            }
         })
 
         app.put('/users/admin/:id', verifyJwt, verifyAdmin, async (req, res) => {
@@ -217,7 +235,48 @@ async function run() {
             }
             const sellerUpdate = await sellerCollections.updateOne(filter, updatedDoc, options)
             res.send(sellerUpdate)
-        })        
+        })
+
+        app.get('/payment/:id', async (req, res) => {
+            const id = req.params.id
+            const filter = { _id: ObjectId(id) }
+            const result = await bookingCollections.findOne(filter)
+            res.send(result)
+        })
+
+        app.post("/create-payment-intent", async (req, res) => {
+            const booking = req.body;
+            const price = booking.price
+            const amount = price * 100
+
+            const paymentIntent = await stripe.paymentIntents.create({
+                currency: "usd",
+                amount: amount,
+                "payment_method_types": [
+                    "card"
+                ]
+            });
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            });
+        });
+
+        app.post('/payment',async(req,res) => {
+            const payment = req.body
+            const result = await paymentCollections.insertOne(payment)
+
+            const id = payment.bookingId
+            const filter = { _id: ObjectId(id) }
+            const options = { upsert: true }
+            const updatedDoc = {
+                $set: {
+                    paid: true,
+                    trasactionId: payment.transactionId
+                }
+            }
+            const booking = await bookingCollections.updateOne(filter,updatedDoc,options)
+            res.send(result)
+        })
     }
     finally {
 
