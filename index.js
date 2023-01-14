@@ -10,7 +10,6 @@ const stripe = require("stripe")(process.env.STRIPE_SK)
 app.use(express.json())
 app.use(cors())
 
-
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ampetqi.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
@@ -37,17 +36,15 @@ async function run() {
         const sellerCollections = client.db('secondDeal').collection('seller')
         const buyersCollections = client.db('secondDeal').collection('buyer')
         const paymentCollections = client.db('secondDeal').collection('payment')
+        const advertiseCollections = client.db('secondDeal').collection('advertise')
 
         const verifyAdmin = async (req, res, next) => {
             const decodedEmail = req.decoded.email
-            console.log(decodedEmail)
             const query = { email: decodedEmail }
             const buyerUser = await buyersCollections.findOne(query)
             const sellerUser = await sellerCollections.findOne(query)
-            console.log(buyerUser)
-            console.log(sellerUser)
 
-            if (buyerUser.role == 'Admin' || sellerUser?.role == 'Admin') {
+            if (buyerUser?.role === 'Admin' || sellerUser?.role === 'Admin') {
                 return next()
             }
             res.status(401).send('unauthorized access')
@@ -59,13 +56,6 @@ async function run() {
             res.send(result)
         })
 
-        app.get('/category/:id', async (req, res) => {
-            const id = req.params.id
-            const filter = { _id: ObjectId(id) }
-            const result = await categoryCollections.findOne(filter)
-            res.send(result)
-        })
-
         app.get('/booking', async (req, res) => {
             const email = req.query.email
             const query = { email: email }
@@ -73,8 +63,25 @@ async function run() {
             res.send(booking)
         })
 
-        app.post('/booking', async (req, res) => {
+        app.post('/booking',verifyJwt, async (req, res) => {
+            const decodedEmail = req.decoded.email
+            const query = { email: decodedEmail }
+            const buyer = await buyersCollections.findOne(query)
+            if (!buyer) {
+                return res.status(404).send('buyer not found')
+            }
+
             const booking = req.body
+            const bookingQuery = {
+                productName: booking.productName,
+                email: booking.email
+            }
+            const alreadyBooked = await bookingCollections.find(bookingQuery).toArray()
+            if (alreadyBooked.length) {
+                const message = 'you have already booked this product'
+                return res.send({message})
+            }
+
             const result = await bookingCollections.insertOne(booking)
             res.send(result)
         })
@@ -95,6 +102,13 @@ async function run() {
 
         app.get('/products', async (req, res) => {
             const query = {}
+            const result = await productsCollections.find(query).toArray()
+            res.send(result)
+        })
+
+        app.get('/products/category/:name', async (req, res) => {
+            const name = req.params.name
+            const query = {categoryName: name}
             const result = await productsCollections.find(query).toArray()
             res.send(result)
         })
@@ -215,7 +229,7 @@ async function run() {
             } else if (seller) {
                 return res.send({ isAdmin: seller.role == 'Admin' })
             } else {
-                res.send({ isAdmin: false })
+                return res.send({ isAdmin: false })
             }
         })
 
@@ -225,7 +239,8 @@ async function run() {
             const buyer = await buyersCollections.findOne(filter)
             const updatedDoc = {
                 $set: {
-                    role: 'Admin'
+                    role: 'Admin',
+                    providerId: ''
                 }
             }
             const options = { upsert: true }
@@ -271,10 +286,29 @@ async function run() {
             const updatedDoc = {
                 $set: {
                     paid: true,
-                    trasactionId: payment.transactionId
+                    transactionId: payment.transactionId
                 }
             }
             const booking = await bookingCollections.updateOne(filter,updatedDoc,options)
+            res.send(result)
+        })
+
+        app.get('/advertise',async (req,res) => {
+            const query = {}
+            const advertise = await advertiseCollections.find(query).toArray()
+            res.send(advertise)
+        })
+
+        app.post('/advertise',verifyJwt,async (req,res) => {
+            const decodedEmail = req.decoded.email
+            const query = { email: decodedEmail }
+            const buyer = await buyersCollections.findOne(query)
+            if (!buyer) {
+                return res.status(404).send('buyer not found')
+            }
+
+            const advertise = req.body
+            const result = await advertiseCollections.insertOne(advertise)
             res.send(result)
         })
     }
