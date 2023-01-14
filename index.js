@@ -170,7 +170,7 @@ async function run() {
         })
 
         app.get('/buyers', async (req, res) => {
-            const query = {}
+            const query = {providerId: 'user'}
             const buyers = await buyersCollections.find(query).toArray()
             res.send(buyers)
         })
@@ -183,7 +183,7 @@ async function run() {
         })
 
         app.get('/seller', async (req, res) => {
-            const query = {}
+            const query = {providerId: 'seller'}
             const sellers = await sellerCollections.find(query).toArray()
             res.send(sellers)
         })
